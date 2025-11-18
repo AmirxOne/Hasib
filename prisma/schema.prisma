@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  username      String         @unique 
+  password      String
+  name          String
+  role          UserRole       @default(INVESTOR)
+  accounts      Account[]
+  transactions  Transaction[]
+  profitReports ProfitReport[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("users")
+}
+
+model Account {
+  id           String        @id @default(cuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  balance      Float         @default(0)
+  currency     Currency      @default(IRR)
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@map("accounts")
+}
+
+model Transaction {
+  id              String          @id @default(cuid())
+  accountId       String
+  account         Account         @relation(fields: [accountId], references: [id])
+  userId          String
+  user            User            @relation(fields: [userId], references: [id])
+  type            TransactionType
+  amount          Float
+  currency        Currency
+  exchangeRate    Float?
+  profitRate      Float?
+  splitRatio      Float           @default(0.7)
+  description     String?
+  transactionDate DateTime
+  createdAt       DateTime        @default(now())
+
+  @@map("transactions")
+}
+
+model ProfitReport {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  period        DateTime
+  totalProfit   Float
+  investorShare Float
+  managerShare  Float
+  status        ReportStatus @default(PENDING)
+  createdAt     DateTime     @default(now())
+
+  @@map("profit_reports")
+}
+
+model ExchangeRate {
+  id          String   @id @default(cuid())
+  fromCurrency Currency
+  toCurrency   Currency
+  rate        Float
+  date        DateTime @default(now())
+  
+  @@map("exchange_rates")
+}
+
+enum UserRole {
+  ADMIN
+  INVESTOR
+}
+
+enum Currency {
+  IRR
+  USD
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  PROFIT
+  ADJUSTMENT
+}
+
+enum ReportStatus {
+  PENDING
+  CALCULATED
+  PAID
+}
