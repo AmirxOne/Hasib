@@ -1,28 +1,37 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAppDispatch, useAppSelector } from '@/store/store'
+import { useDispatch, useSelector } from 'react-redux'
 import { loginUser } from '@/store/features/authSlice'
 import { useRouter } from 'next/navigation'
+import type { RootState } from '@/store/store'
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('admin') // پیش‌فرض برای تست
-  const [password, setPassword] = useState('123456') // پیش‌فرض برای تست
-  const dispatch = useAppDispatch()
-  const { user, isAuthenticated, loading, error } = useAppSelector((state) => state.auth)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [isClient, setIsClient] = useState(false)
+  const dispatch = useDispatch()
   const router = useRouter()
+  
+  const { user, isAuthenticated, loading, error } = useSelector((state: RootState) => state.auth)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   // اگر کاربر لاگین کرده، به دشبورد برو
   useEffect(() => {
     if (isAuthenticated && user) {
+      console.log('✅ کاربر لاگین کرد، انتقال به دشبورد...')
       router.push('/dashboard')
     }
   }, [isAuthenticated, user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('لاگین با:', { username, password })
+    console.log('📤 درخواست لاگین:', { username, password })
     
+    // @ts-ignore
     const result = await dispatch(loginUser({ username, password }))
     
     if (loginUser.fulfilled.match(result)) {
@@ -32,7 +41,16 @@ export default function LoginPage() {
     }
   }
 
-  // صفحه خیلی ساده - فقط برای تست منطق
+  // تا زمانی که کلینت آماده نشده، چیزی رندر نکن
+  if (!isClient) {
+    return (
+      <div style={{ padding: 20, fontFamily: 'Arial' }}>
+        <h1>ورود به سیستم حسابداری</h1>
+        <div>در حال بارگذاری...</div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: 20, fontFamily: 'Arial' }}>
       <h1>ورود به سیستم حسابداری</h1>
@@ -61,7 +79,13 @@ export default function LoginPage() {
         <button 
           type="submit" 
           disabled={loading}
-          style={{ padding: '8px 16px', backgroundColor: loading ? '#ccc' : '#007acc', color: 'white', border: 'none' }}
+          style={{ 
+            padding: '8px 16px', 
+            backgroundColor: loading ? '#ccc' : '#007acc', 
+            color: 'white', 
+            border: 'none',
+            cursor: loading ? 'not-allowed' : 'pointer'
+          }}
         >
           {loading ? 'در حال ورود...' : 'ورود'}
         </button>

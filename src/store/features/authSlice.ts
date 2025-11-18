@@ -1,6 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 
-// انواع TypeScript
 interface User {
   id: string
   username: string
@@ -17,7 +16,6 @@ interface AuthState {
   error: string | null
 }
 
-// حالت اولیه
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
@@ -35,6 +33,7 @@ export const loginUser = createAsyncThunk(
         headers: { 
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // اضافه کردن برای ارسال cookies
         body: JSON.stringify(credentials),
       })
 
@@ -51,7 +50,74 @@ export const loginUser = createAsyncThunk(
   }
 )
 
-// ایجاد slice
+// برای refresh token
+export const refreshTokens = createAsyncThunk(
+  'auth/refresh',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include' // مهم: برای ارسال cookies
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return rejectWithValue(data.error || 'خطا در refresh token')
+      }
+
+      return data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'خطا در ارتباط با سرور')
+    }
+  }
+)
+
+// برای لاگ‌اوت
+export const logoutUser = createAsyncThunk(
+  'auth/logout',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return rejectWithValue(data.error || 'خطا در خروج')
+      }
+
+      return data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'خطا در ارتباط با سرور')
+    }
+  }
+)
+
+// برای بررسی وضعیت احراز هویت
+export const checkAuth = createAsyncThunk(
+  'auth/check',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include'
+      })
+
+      const data = await response.json()
+
+      if (data.isAuthenticated) {
+        return data
+      } else {
+        return rejectWithValue('Not authenticated')
+      }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'خطا در بررسی وضعیت')
+    }
+  }
+)
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -86,6 +152,55 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
+        state.isAuthenticated = false
+      })
+      
+      // Refresh Token
+      .addCase(refreshTokens.pending, (state) => {
+        state.loading = true
+      })
+      .addCase(refreshTokens.fulfilled, (state) => {
+        state.loading = false
+        state.error = null
+      })
+      .addCase(refreshTokens.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+        state.isAuthenticated = false
+        state.user = null
+      })
+      
+      // لاگ‌اوت
+      .addCase(logoutUser.pending, (state) => {
+        state.loading = true
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.loading = false
+        state.user = null
+        state.isAuthenticated = false
+        state.error = null
+      })
+      .addCase(logoutUser.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+        // حتی اگر خطا داشت، کاربر رو لاگ‌اوت کن
+        state.user = null
+        state.isAuthenticated = false
+      })
+      
+      // بررسی وضعیت احراز هویت
+      .addCase(checkAuth.pending, (state) => {
+        state.loading = true
+      })
+      .addCase(checkAuth.fulfilled, (state, action) => {
+        state.loading = false
+        state.user = action.payload.user
+        state.isAuthenticated = true
+        state.error = null
+      })
+      .addCase(checkAuth.rejected, (state) => {
+        state.loading = false
+        state.user = null
         state.isAuthenticated = false
       })
   },

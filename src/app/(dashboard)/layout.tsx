@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 // Components
-import Header from "./_components/header/Header";
+// import Header from "./_components/header/Header";
 
 // Metadata for the dashboard page
 export const metadata: Metadata = {
@@ -17,7 +17,7 @@ export default function RootLayout({
   return (
     <>
       {/* Header component */}
-      <Header />
+      {/* <Header /> */}
       {/* Main content */}
         {children}
     </>

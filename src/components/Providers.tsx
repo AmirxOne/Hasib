@@ -1,17 +1,16 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { createPortal } from "react-dom";
+import React, { useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
-import { Provider } from "react-redux";
+import { Provider, useDispatch } from "react-redux";
 import { store } from "@/store/store";
-//toast 
+// toast 
 import { Toaster } from 'react-hot-toast';
-//logo logger
+// logo logger
 import { logLogo } from "../functions/logLogo";
-//icons
-
+// icons
 import { Suspense } from 'react'
+import { checkAuth } from "@/store/features/authSlice";
 
 interface DescriptionLog {
   version: string;
@@ -19,9 +18,30 @@ interface DescriptionLog {
   message: string;
 }
 
+// کامپوننت جداگانه برای مدیریت auth
+function AuthInitializer() {
+  const dispatch = useDispatch()
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  useEffect(() => {
+    if (isClient) {
+      // @ts-ignore - چون dispatch تایپ نشده
+      dispatch(checkAuth())
+    }
+  }, [isClient, dispatch])
+
+  return null
+}
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [isLandscape, setIsLandscape] = React.useState(true);
-  //log the khodnevis logo
+  const [isMounted, setIsMounted] = useState(false)
+  
+  // log the khodnevis logo
   useEffect(() => {
     const descriptionLog: DescriptionLog = {
       version: '1.0.0',
@@ -29,35 +49,23 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       message: 'hello developer!'
     };
     logLogo(descriptionLog);
+    setIsMounted(true)
   }, []);
 
-  useEffect(() => {
-    // Function to check if the device is in landscape mode
-    const checkOrientation = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-      if (window.innerWidth > window.innerHeight) {
-        document.body.style.overflow = 'auto';
-      } else {
-        document.body.style.overflow = 'hidden';
-      }
-    };
-
-    checkOrientation();
-
-    // Add event listener to check orientation on window resize
-    window.addEventListener('resize', checkOrientation);
-
-    // Cleanup event listener on component unmount
-    return () => {
-      window.removeEventListener('resize', checkOrientation);
-    };
-  }, []);
+  // تا زمانی که کامپوننت mount نشده، چیزی رندر نکن
+  if (!isMounted) {
+    return (
+      <Provider store={store}>
+        <div style={{ display: 'none' }}>Loading...</div>
+      </Provider>
+    )
+  }
 
   return (
     <Provider store={store}>
+      <AuthInitializer />
       <Toaster />
       
-
       <ThemeProvider defaultTheme="light" enableSystem>
         <Suspense>
           {children}

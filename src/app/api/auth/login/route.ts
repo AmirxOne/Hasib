@@ -1,26 +1,27 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
+import { generateAccessToken, generateRefreshToken, type TokenPayload } from '@/lib/jwt'
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json()  // تغییر به username
+    const { username, password } = await request.json()
 
     if (!username || !password) {
       return NextResponse.json(
-        { error: 'نام کاربری و رمز عبور الزامی است' },  // تغییر پیام
+        { error: 'نام کاربری و رمز عبور الزامی است' },
         { status: 400 }
       )
     }
 
-    // پیدا کردن کاربر با username
+    // پیدا کردن کاربر
     const user = await prisma.user.findUnique({
-      where: { username }  // تغییر به username
+      where: { username }
     })
 
     if (!user) {
       return NextResponse.json(
-        { error: 'کاربری با این نام کاربری وجود ندارد' },  // تغییر پیام
+        { error: 'کاربری با این نام کاربری وجود ندارد' },
         { status: 401 }
       )
     }
@@ -35,13 +36,52 @@ export async function POST(request: Request) {
       )
     }
 
-    // برگرداندن اطلاعات کاربر (بدون پسورد)
-    const { password: _, ...userWithoutPassword } = user
+    // تولید توکن‌ها
+    const tokenPayload: TokenPayload = {
+      userId: user.id,
+      username: user.username,
+      role: user.role as 'ADMIN' | 'INVESTOR'
+    }
 
-    return NextResponse.json({
-      message: 'لاگین موفقیت‌آمیز بود',
-      user: userWithoutPassword
+    const accessToken = generateAccessToken(tokenPayload)
+    const refreshToken = generateRefreshToken(tokenPayload)
+
+    // ذخیره refresh token در دیتابیس
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { 
+        refreshToken: refreshToken,
+        lastLogin: new Date()
+      }
     })
+
+    // ایجاد response
+    const response = NextResponse.json({
+      message: 'لاگین موفقیت‌آمیز بود',
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        role: user.role
+      }
+    })
+
+    // تنظیم HttpOnly cookies
+    response.cookies.set('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 // 24 ساعت (به ثانیه)
+    })
+
+    response.cookies.set('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 7 روز (به ثانیه)
+    })
+
+    return response
 
   } catch (error) {
     console.error('Login error:', error)
